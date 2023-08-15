@@ -1,3 +1,5 @@
+import { Pool } from "pg";
+
 export interface DbItem {
   title: string;
   completed: boolean;

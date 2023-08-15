@@ -1,0 +1,7 @@
+CREATE DATABASE tododb;
+
+CREATE TABLE todo(
+    id SERIAL PRIMARY KEY,
+    title VARChar(200) NOT NULL,
+    completed BOOLEAN DEFAULT false NOT NULL
+)
