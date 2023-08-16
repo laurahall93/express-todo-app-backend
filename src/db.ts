@@ -1,5 +1,12 @@
 import { Pool } from "pg";
 
+const pool = new Pool({
+  user: "academy",
+  database: "tododb",
+  password: "",
+  host: "localhost",
+});
+
 export interface DbItem {
   title: string;
   completed: boolean;
@@ -9,42 +16,18 @@ export interface DbItemWithId extends DbItem {
   id: number;
 }
 
-const db: DbItemWithId[] = [];
-
-/** Variable to keep incrementing id of database items */
-let idCounter = 0;
-
-/**
- * Adds in some dummy database items to the database
- *
- * @param n - the number of items to generate
- * @returns the created items
- */
-export const addDummyDbItems = (n: number): DbItemWithId[] => {
-  const createdSignatures: DbItemWithId[] = [];
-  for (let count = 0; count < n; count++) {
-    const createdSignature = addDbItem({
-      title: "do groceries",
-      completed: false,
-    });
-    createdSignatures.push(createdSignature);
-  }
-  return createdSignatures;
-};
-
 /**
  * Adds in a single item to the database
  *
  * @param data - the item data to insert in
  * @returns the item added (with a newly created id)
  */
-export const addDbItem = (data: DbItem): DbItemWithId => {
-  const newEntry: DbItemWithId = {
-    id: ++idCounter,
-    ...data,
-  };
-  db.push(newEntry);
-  return newEntry;
+export const addDbItem = async (data: DbItem): Promise<DbItemWithId> => {
+  const newItem = await pool.query(
+    "INSERT INTO todo (title) VALUES($1) RETURNING *",
+    [data.title]
+  );
+  return newItem.rows[0];
 };
 
 /**
@@ -54,31 +37,17 @@ export const addDbItem = (data: DbItem): DbItemWithId => {
  * @returns the deleted database item (if originally located),
  *  otherwise the string `"not found"`
  */
-export const deleteDbItemById = (id: number): DbItemWithId | "not found" => {
-  const idxToDeleteAt = findIndexOfDbItemById(id);
-  if (typeof idxToDeleteAt === "number") {
-    const itemToDelete = getDbItemById(id);
-    db.splice(idxToDeleteAt, 1); // .splice can delete from an array
-    return itemToDelete;
-  } else {
+export const deleteDbItemById = async (
+  id: number
+): Promise<DbItemWithId | "not found"> => {
+  const deletedItem = await pool.query(
+    "DELETE FROM todo WHERE id = $1 RETURNING *",
+    [id]
+  );
+  if (deletedItem.rowCount == 0) {
     return "not found";
-  }
-};
-
-/**
- * Finds the index of a database item with a given id
- *
- * @param id - the id of the database item to locate the index of
- * @returns the index of the matching database item,
- *  otherwise the string `"not found"`
- */
-const findIndexOfDbItemById = (id: number): number | "not found" => {
-  const matchingIdx = db.findIndex((entry) => entry.id === id);
-  // .findIndex returns -1 if not located
-  if (matchingIdx !== -1) {
-    return matchingIdx;
   } else {
-    return "not found";
+    return deletedItem.rows[0];
   }
 };
 
@@ -86,8 +55,9 @@ const findIndexOfDbItemById = (id: number): number | "not found" => {
  * Find all database items
  * @returns all database items from the database
  */
-export const getAllDbItems = (): DbItemWithId[] => {
-  return db;
+export const getAllDbItems = async (): Promise<DbItemWithId[]> => {
+  const allItems = await pool.query("SELECT * FROM todo");
+  return allItems.rows;
 };
 
 /**
@@ -97,12 +67,14 @@ export const getAllDbItems = (): DbItemWithId[] => {
  * @returns the located database item (if found),
  *  otherwise the string `"not found"`
  */
-export const getDbItemById = (id: number): DbItemWithId | "not found" => {
-  const maybeEntry = db.find((entry) => entry.id === id);
-  if (maybeEntry) {
-    return maybeEntry;
-  } else {
+export const getDbItemById = async (
+  id: number
+): Promise<DbItemWithId | "not found"> => {
+  const itemById = await pool.query("SELECT * FROM todo WHERE id = $1", [id]);
+  if (itemById.rowCount == 0) {
     return "not found";
+  } else {
+    return itemById.rows[0];
   }
 };
 
@@ -115,15 +87,17 @@ export const getDbItemById = (id: number): DbItemWithId | "not found" => {
  * @returns the updated database item (if one is located),
  *  otherwise the string `"not found"`
  */
-export const updateDbItemById = (
+export const updateDbItemById = async (
   id: number,
   newData: Partial<DbItem>
-): DbItemWithId | "not found" => {
-  const idxOfEntry = findIndexOfDbItemById(id);
-  // type guard against "not found"
-  if (typeof idxOfEntry === "number") {
-    return Object.assign(db[idxOfEntry], newData);
-  } else {
+): Promise<DbItemWithId | "not found"> => {
+  const updatedItem = await pool.query(
+    "UPDATE todo SET title = $1, completed = $2 WHERE id = $3 RETURNING *",
+    [newData.title, newData.completed, id]
+  );
+  if (updatedItem.rowCount == 0) {
     return "not found";
+  } else {
+    return updatedItem.rows[0];
   }
 };
