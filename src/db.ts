@@ -1,10 +1,7 @@
 import { Pool } from "pg";
 
 const pool = new Pool({
-  user: "academy",
-  database: "tododb",
-  password: "",
-  host: "localhost",
+  connectionString: process.env.DATABASE_URL,
 });
 
 export interface DbItem {
@@ -56,7 +53,9 @@ export const deleteDbItemById = async (
  * @returns all database items from the database
  */
 export const getAllDbItems = async (): Promise<DbItemWithId[]> => {
-  const allItems = await pool.query("SELECT * FROM todo");
+  const allItems = await pool.query(
+    "SELECT * FROM todo ORDER BY completed ASC"
+  );
   return allItems.rows;
 };
 
